@@ -88,3 +88,71 @@ df_enrollment %>%
   geom_histogram(binwidth=5, fill='#80b1d3') +
   geom_vline(aes(xintercept=brazil_value, color='teste'), color='#000000', size=1, linetype='dashed') +
   geom_text(aes(x=brazil_value+2.5, y=-.2, label='Brazil'))
+
+# checking the investment in education
+# getting money invested in education based on GDP (https://data.oecd.org/gdp/gross-domestic-product-gdp.htm)
+df_gdp_spent <- df_cleaned %>%
+  filter(indicator_code  == 'SE.XPD.TOTL.GD.ZS') %>%
+  # getting useful Country names to the plots
+  merge(df_countries, by='country_code') %>%
+  # removing countries not associated with any Income Group
+  filter(!is.na(income_group)) %>%
+  select(c(country_code, income_group, indicator_code, x2010:x2019)) %>%
+  remove_empty(which='cols') %>%
+  # creating a different group to Brazil, to make it comparable with other groups
+  mutate(income_group=if_else(country_code == 'BRA', 'Brazil', income_group)) %>%
+  # pivoting table to make it easier to plot
+  pivot_longer(x2010:x2019, names_to='year', values_to='gdp_percent') %>%
+  group_by(country_code, indicator_code) %>%
+  fill(gdp_percent, .direction='downup') %>%
+  # filtering to get only the countries with at least 1 not NA value for each indicator
+  filter(!is.na(gdp_percent))
+
+df_gdp_spent_grouped <- df_gdp_spent %>%
+  group_by(income_group, indicator_code, year) %>%
+  summarise(mean=mean(gdp_percent), sd=sd(gdp_percent)) %>%
+# cleaning year values to make it easier to use as label
+  mutate(year=gsub('x', '', year))
+
+
+ggplot(df_gdp_spent_grouped, aes(x=year, y=mean, group=income_group)) +
+  geom_line(aes(color=income_group)) +
+  expand_limits(y = 0)
+
+
+# getting GDP per capita changes over time
+df_gdp <- df_cleaned %>%
+  filter(indicator_code  == 'NY.GDP.PCAP.KD') %>%
+  # getting useful Country names to the plots
+  merge(df_countries, by='country_code') %>%
+  # removing countries not associated with any Income Group
+  filter(!is.na(income_group)) %>%
+  select(c(country_code, income_group, indicator_code, x2010:x2019)) %>%
+  remove_empty(which='cols') %>%
+  # creating a different group to Brazil, to make it comparable with other groups
+  mutate(income_group=if_else(country_code == 'BRA', 'Brazil', income_group)) %>%
+  # pivoting table to make it easier to plot
+  pivot_longer(x2010:x2019, names_to='year', values_to='gdp_per_capita') %>%
+  group_by(country_code, indicator_code) %>%
+  fill(gdp_per_capita, .direction='downup') %>%
+  # filtering to get only the countries with at least 1 not NA value for each indicator
+  filter(!is.na(gdp_per_capita))
+
+df_gdp_grouped <- df_gdp %>%
+  group_by(income_group, indicator_code, year) %>%
+  summarise(mean=mean(gdp_per_capita), sd=sd(gdp_per_capita)) %>%
+  # cleaning year values to make it easier to use as label
+  mutate(year=gsub('x', '', year))
+  
+ggplot(df_gdp_grouped, aes(x=year, y=mean, group=income_group)) +
+  geom_line(aes(color=income_group)) +
+  expand_limits(y = 0)
+  
+
+# ggplot(df_gdp, aes(x=`year`, y=`GDP per capita (constant 2015 US$)`, group=`Short Name`)) +
+#   geom_line(aes(color=`Short Name`)) +
+#   scale_y_continuous(labels=scales::comma) +
+#   # making the chart to start at the 0 point
+#   expand_limits(y=0) +
+#   # changing to more distinctive colors
+#   scale_colour_brewer(palette = "Set1")
