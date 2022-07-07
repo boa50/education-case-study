@@ -64,7 +64,7 @@ df_enrollment_grouped <- df_enrollment %>%
   group_by(income_group, indicator_code, year) %>%
   summarise(mean=mean(enrollment), sd=sd(enrollment))
 
-legend_order <- c('High income', 'Upper middle income', 'Lower middle income', 'Low income', 'Brazil')
+legend_order <- c('Brazil', 'High income', 'Upper middle income', 'Lower middle income', 'Low income')
 color_scale <- 'Set2'
 
 ggplot(df_enrollment_grouped, aes(x=year, y=mean, group=income_group)) +
@@ -72,9 +72,19 @@ ggplot(df_enrollment_grouped, aes(x=year, y=mean, group=income_group)) +
   geom_ribbon(aes(ymin=mean - sd, ymax=mean + sd, fill=income_group), alpha=.15) +
   expand_limits(y = 0) +
   # changing the order of the legend values
-  scale_fill_discrete(breaks=legend_order) +
-  scale_color_discrete(breaks=legend_order) +
-  scale_fill_brewer(palette=color_scale) +
-  scale_colour_brewer(palette=color_scale) +
+  scale_fill_brewer(breaks=legend_order, palette=color_scale) +
+  scale_colour_brewer(breaks=legend_order, palette=color_scale) +
   facet_wrap(vars(indicator_code))
 
+# checking the distribution of values about secondary education enrolling for the Upper middle income countries
+brazil_value <- df_enrollment %>%
+  filter(income_group == 'Brazil' & indicator_code == 'SE.SEC.NENR' & year == '2019')
+brazil_value <- brazil_value$enrollment
+
+df_enrollment %>%
+  filter(income_group %in% c('Brazil', 'Upper middle income') & 
+           indicator_code == 'SE.SEC.NENR' & year == '2019') %>%
+  ggplot(aes(x=enrollment)) + 
+  geom_histogram(binwidth=5, fill='#80b1d3') +
+  geom_vline(aes(xintercept=brazil_value, color='teste'), color='#000000', size=1, linetype='dashed') +
+  geom_text(aes(x=brazil_value+2.5, y=-.2, label='Brazil'))
