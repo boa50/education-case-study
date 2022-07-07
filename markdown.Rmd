@@ -1,0 +1,14 @@
+---
+title: "Markdown"
+author: "Bruno Oliveira de Albuquerque"
+date: '2022-07-04'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Annotations
+
+Using EdStatsSeries.csv we could get information about the indicators
