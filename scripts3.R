@@ -195,6 +195,42 @@ df_children_employment <- df_cleaned %>%
   select(c(country_code, income_group, indicator_code, x2010:x2019)) %>%
   # creating a different group to Brazil, to make it comparable with other groups
   mutate(income_group=if_else(country_code == 'BRA', 'Brazil', income_group)) %>%
+  # getting only the last year from the last five because there is a lot of NA values
+  mutate(children_employment=do.call(coalesce, rev(across(x2015:x2019)))) %>%
+  select(c(country_code, income_group, children_employment)) %>%
+  filter(!is.na(children_employment))
+
+ggplot(df_children_employment, aes(x=income_group, y=children_employment)) + 
+  geom_boxplot(aes(fill=income_group)) +
+  # removing the legend as it is not necessary on this chart
+  theme(legend.position='none') +
+  # changing the order of the legend values and setting default colors
+  scale_x_discrete(limits=legend_order) +
+  scale_fill_brewer(palette=color_scale)
+
+
+# getting data about poverty !caution
+# distribution of income share per group
+# SI.DST.05TH.20: Income share held by highest 20%
+# SI.DST.04TH.20: Income share held by fourth 20%
+# SI.DST.03RD.20: Income share held by third 20%
+# SI.DST.02ND.20: Income share held by second 20%
+# SI.DST.FRST.20: Income share held by lowest 20%
+df_poverty <- df_cleaned %>%
+  filter(indicator_code  == 'SI.DST.FRST.20') %>%
+  # getting useful Country names to the plots
+  merge(df_countries, by='country_code') %>%
+  # removing countries not associated with any Income Group
+  filter(!is.na(income_group)) %>%
+  select(c(country_code, income_group, indicator_code, x2010:x2019)) %>%
+  # creating a different group to Brazil, to make it comparable with other groups
+  mutate(income_group=if_else(country_code == 'BRA', 'Brazil', income_group)) 
+
+%>%
+  # getting only the last year from the last five because there is a lot of NA values
+  mutate(children_employment=do.call(coalesce, rev(across(x2015:x2019)))) %>%
+
+%>%
   # getting only the last year because there is a lot of NA values
   mutate(children_employment=do.call(coalesce, rev(across(x2010:x2019)))) %>%
   select(c(country_code, income_group, children_employment)) %>%
