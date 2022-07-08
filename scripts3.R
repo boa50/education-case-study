@@ -161,15 +161,13 @@ df_gdp_spent_per_capita <- df_gdp_spent_percent %>%
 df_gdp_spent_per_capita_grouped <- df_gdp_spent_per_capita %>%
   group_by(income_group, year) %>%
   summarise(mean=mean(gdp_spent_per_capita), sd=sd(gdp_spent_per_capita)) 
-# %>%
-#   # cleaning year values to make it easier to use as label
-#   mutate(year=gsub('x', '', year))
+
 
 ggplot(df_gdp_spent_per_capita_grouped, aes(x=year, y=mean, group=income_group)) +
   geom_line(aes(color=income_group), size=1) +
   geom_ribbon(aes(ymin=mean - sd, ymax=mean + sd, fill=income_group), alpha=.15) +
   expand_limits(y = 0) +
-  # changing the order of the legend values
+  # changing the order of the legend values and setting default colors
   scale_fill_brewer(breaks=legend_order, palette=color_scale) +
   scale_colour_brewer(breaks=legend_order, palette=color_scale)
 
@@ -184,3 +182,28 @@ df_gdp_spent_per_capita %>%
   geom_histogram(binwidth=200, fill='#80b1d3') +
   geom_vline(aes(xintercept=brazil_value_gdp_per_capita), color='#757575', size=1, linetype='dashed') +
   geom_text(aes(x=brazil_value_gdp_per_capita+250, y=-.2, label='Brazil'))
+
+
+# getting data on children in employment 7 - 14 year
+# SL.TLF.0714.ZS
+df_children_employment <- df_cleaned %>%
+  filter(indicator_code  == 'SL.TLF.0714.ZS') %>%
+  # getting useful Country names to the plots
+  merge(df_countries, by='country_code') %>%
+  # removing countries not associated with any Income Group
+  filter(!is.na(income_group)) %>%
+  select(c(country_code, income_group, indicator_code, x2010:x2019)) %>%
+  # creating a different group to Brazil, to make it comparable with other groups
+  mutate(income_group=if_else(country_code == 'BRA', 'Brazil', income_group)) %>%
+  # getting only the last year because there is a lot of NA values
+  mutate(children_employment=do.call(coalesce, rev(across(x2010:x2019)))) %>%
+  select(c(country_code, income_group, children_employment)) %>%
+  filter(!is.na(children_employment))
+
+ggplot(df_children_employment, aes(x=income_group, y=children_employment)) + 
+  geom_boxplot(aes(fill=income_group)) +
+  # removing the legend as it is not necessary on this chart
+  theme(legend.position='none') +
+  # changing the order of the legend values and setting default colors
+  scale_x_discrete(limits=legend_order) +
+  scale_fill_brewer(palette=color_scale)
