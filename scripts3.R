@@ -86,7 +86,7 @@ df_enrollment %>%
            indicator_code == 'SE.SEC.NENR' & year == '2019') %>%
   ggplot(aes(x=enrollment)) + 
   geom_histogram(binwidth=5, fill='#80b1d3') +
-  geom_vline(aes(xintercept=brazil_value, color='teste'), color='#757575', size=1, linetype='dashed') +
+  geom_vline(aes(xintercept=brazil_value), color='#757575', size=1, linetype='dashed') +
   geom_text(aes(x=brazil_value+2.5, y=-.2, label='Brazil'))
 
 # checking the investment in education
@@ -154,13 +154,18 @@ df_gdp_spent_per_capita <- df_gdp_spent_percent %>%
   rename(income_group=income_group.x) %>%
   select(c(country_code, year, income_group, gdp_percent, gdp_per_capita)) %>%
   # getting the gdp spent per capita
-  mutate(gdp_spent_per_capita=(gdp_percent/100) * gdp_per_capita) %>%
+  mutate(
+    gdp_spent_per_capita=(gdp_percent/100) * gdp_per_capita, 
+    year=gsub('x', '', year))
+  
+df_gdp_spent_per_capita_grouped <- df_gdp_spent_per_capita %>%
   group_by(income_group, year) %>%
-  summarise(mean=mean(gdp_spent_per_capita), sd=sd(gdp_spent_per_capita)) %>%
-  # cleaning year values to make it easier to use as label
-  mutate(year=gsub('x', '', year))
+  summarise(mean=mean(gdp_spent_per_capita), sd=sd(gdp_spent_per_capita)) 
+# %>%
+#   # cleaning year values to make it easier to use as label
+#   mutate(year=gsub('x', '', year))
 
-ggplot(df_gdp_spent_per_capita, aes(x=year, y=mean, group=income_group)) +
+ggplot(df_gdp_spent_per_capita_grouped, aes(x=year, y=mean, group=income_group)) +
   geom_line(aes(color=income_group), size=1) +
   geom_ribbon(aes(ymin=mean - sd, ymax=mean + sd, fill=income_group), alpha=.15) +
   expand_limits(y = 0) +
@@ -168,10 +173,14 @@ ggplot(df_gdp_spent_per_capita, aes(x=year, y=mean, group=income_group)) +
   scale_fill_brewer(breaks=legend_order, palette=color_scale) +
   scale_colour_brewer(breaks=legend_order, palette=color_scale)
 
-# ggplot(df_gdp, aes(x=`year`, y=`GDP per capita (constant 2015 US$)`, group=`Short Name`)) +
-#   geom_line(aes(color=`Short Name`)) +
-#   scale_y_continuous(labels=scales::comma) +
-#   # making the chart to start at the 0 point
-#   expand_limits(y=0) +
-#   # changing to more distinctive colors
-#   scale_colour_brewer(palette = "Set1")
+# let's compare how far we are from the majority of high income countries
+brazil_value_gdp_per_capita <- df_gdp_spent_per_capita %>%
+  filter(income_group == 'Brazil' & year == '2019')
+brazil_value_gdp_per_capita <- brazil_value_gdp_per_capita$gdp_spent_per_capita
+
+df_gdp_spent_per_capita %>%
+  filter(income_group %in% c('Brazil', 'High income') & year == '2019') %>%
+  ggplot(aes(x=gdp_spent_per_capita)) + 
+  geom_histogram(binwidth=200, fill='#80b1d3') +
+  geom_vline(aes(xintercept=brazil_value_gdp_per_capita), color='#757575', size=1, linetype='dashed') +
+  geom_text(aes(x=brazil_value_gdp_per_capita+250, y=-.2, label='Brazil'))
