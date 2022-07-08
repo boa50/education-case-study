@@ -86,12 +86,12 @@ df_enrollment %>%
            indicator_code == 'SE.SEC.NENR' & year == '2019') %>%
   ggplot(aes(x=enrollment)) + 
   geom_histogram(binwidth=5, fill='#80b1d3') +
-  geom_vline(aes(xintercept=brazil_value, color='teste'), color='#000000', size=1, linetype='dashed') +
+  geom_vline(aes(xintercept=brazil_value, color='teste'), color='#757575', size=1, linetype='dashed') +
   geom_text(aes(x=brazil_value+2.5, y=-.2, label='Brazil'))
 
 # checking the investment in education
 # getting money invested in education based on GDP (https://data.oecd.org/gdp/gross-domestic-product-gdp.htm)
-df_gdp_spent <- df_cleaned %>%
+df_gdp_spent_percent <- df_cleaned %>%
   filter(indicator_code  == 'SE.XPD.TOTL.GD.ZS') %>%
   # getting useful Country names to the plots
   merge(df_countries, by='country_code') %>%
@@ -108,7 +108,7 @@ df_gdp_spent <- df_cleaned %>%
   # filtering to get only the countries with at least 1 not NA value for each indicator
   filter(!is.na(gdp_percent))
 
-df_gdp_spent_grouped <- df_gdp_spent %>%
+df_gdp_spent_grouped <- df_gdp_spent_percent %>%
   group_by(income_group, indicator_code, year) %>%
   summarise(mean=mean(gdp_percent), sd=sd(gdp_percent)) %>%
 # cleaning year values to make it easier to use as label
@@ -148,6 +148,25 @@ ggplot(df_gdp_grouped, aes(x=year, y=mean, group=income_group)) +
   geom_line(aes(color=income_group)) +
   expand_limits(y = 0)
   
+df_gdp_spent_per_capita <- df_gdp_spent_percent %>%
+  # joining with gdp data to be able to get the gpd expenditure per capita
+  merge(df_gdp, by=c('country_code', 'year')) %>%
+  rename(income_group=income_group.x) %>%
+  select(c(country_code, year, income_group, gdp_percent, gdp_per_capita)) %>%
+  # getting the gdp spent per capita
+  mutate(gdp_spent_per_capita=(gdp_percent/100) * gdp_per_capita) %>%
+  group_by(income_group, year) %>%
+  summarise(mean=mean(gdp_spent_per_capita), sd=sd(gdp_spent_per_capita)) %>%
+  # cleaning year values to make it easier to use as label
+  mutate(year=gsub('x', '', year))
+
+ggplot(df_gdp_spent_per_capita, aes(x=year, y=mean, group=income_group)) +
+  geom_line(aes(color=income_group), size=1) +
+  geom_ribbon(aes(ymin=mean - sd, ymax=mean + sd, fill=income_group), alpha=.15) +
+  expand_limits(y = 0) +
+  # changing the order of the legend values
+  scale_fill_brewer(breaks=legend_order, palette=color_scale) +
+  scale_colour_brewer(breaks=legend_order, palette=color_scale)
 
 # ggplot(df_gdp, aes(x=`year`, y=`GDP per capita (constant 2015 US$)`, group=`Short Name`)) +
 #   geom_line(aes(color=`Short Name`)) +
