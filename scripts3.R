@@ -216,30 +216,50 @@ ggplot(df_children_employment, aes(x=income_group, y=children_employment)) +
 # SI.DST.03RD.20: Income share held by third 20%
 # SI.DST.02ND.20: Income share held by second 20%
 # SI.DST.FRST.20: Income share held by lowest 20%
+poverty_indicators <- c('SI.DST.FRST.20', 'SI.DST.02ND.20' , 'SI.DST.03RD.20', 'SI.DST.04TH.20', 'SI.DST.05TH.20')
+
 df_poverty <- df_cleaned %>%
-  filter(indicator_code  == 'SI.DST.FRST.20') %>%
+  filter(indicator_code  %in% poverty_indicators) %>%
   # getting useful Country names to the plots
   merge(df_countries, by='country_code') %>%
   # removing countries not associated with any Income Group
   filter(!is.na(income_group)) %>%
+  # getting only the last year from the last five because there is a lot of NA values
   select(c(country_code, income_group, indicator_code, x2010:x2019)) %>%
   # creating a different group to Brazil, to make it comparable with other groups
-  mutate(income_group=if_else(country_code == 'BRA', 'Brazil', income_group)) 
+  mutate(income_group=if_else(country_code == 'BRA', 'Brazil', income_group)) %>%
+  # pivoting table to make it easier to plot
+  pivot_longer(x2010:x2019, names_to='year', values_to='income_share') %>%
+  group_by(country_code, indicator_code) %>%
+  # filling NA values so that each year could have the same number of countries
+  fill(income_share, .direction='downup') %>%
+  filter(!is.na(income_share))
 
-%>%
-  # getting only the last year from the last five because there is a lot of NA values
-  mutate(children_employment=do.call(coalesce, rev(across(x2015:x2019)))) %>%
+df_poverty_grouped <- df_poverty %>%
+  group_by(income_group, indicator_code, year) %>%
+  summarise(mean=mean(income_share), sd=sd(income_share)) %>%
+  # cleaning year values to make it easier to use as label
+  mutate(year=gsub('x', '', year)) %>%
+  # getting the difference of values between years per group
+  mutate(years_difference=abs(mean - lag(mean)))
 
-%>%
-  # getting only the last year because there is a lot of NA values
-  mutate(children_employment=do.call(coalesce, rev(across(x2010:x2019)))) %>%
-  select(c(country_code, income_group, children_employment)) %>%
-  filter(!is.na(children_employment))
+# as the difference of values between years are so small, we are
+# comparing values based only on the last year
+print(max(df_poverty_grouped$years_difference, na.rm=TRUE))
+ggplot(df_poverty_grouped, aes(x=years_difference)) + 
+  geom_histogram(fill='#80b1d3')
 
-ggplot(df_children_employment, aes(x=income_group, y=children_employment)) + 
-  geom_boxplot(aes(fill=income_group)) +
-  # removing the legend as it is not necessary on this chart
-  theme(legend.position='none') +
-  # changing the order of the legend values and setting default colors
+df_poverty_grouped %>%
+  filter(year == '2019') %>%
+  ggplot(aes(
+    # changing the order of the legend values
+    fill=factor(indicator_code, levels=rev(poverty_indicators)),
+    y=mean, x=income_group)) + 
+  geom_bar(position=position_dodge(), stat='identity') +
+  # inserting the standard deviation bars https://bioinformatics.stackexchange.com/questions/11222/stacked-bargraph-with-error-bars
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=0.3, position=position_dodge(0.9), color='#757575') +
+  # setting other colors to differentiate from previous charts
+  # got this custom pallet based on https://colors.dopely.top/palette-generator/ToL9uxh2Egw
+  scale_fill_manual(values=c('#82AC85','#A9C7AC','#BFD8C4','#E2CFC9','#D1ACA5')) + 
   scale_x_discrete(limits=legend_order) +
-  scale_fill_brewer(palette=color_scale)
+  labs(fill='indicator_code')
