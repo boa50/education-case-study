@@ -1,14 +1,182 @@
 ---
-title: "Markdown"
+title: "Brazil's Students Enrollment"
 author: "Bruno Oliveira de Albuquerque"
 date: '2022-07-04'
-output: html_document
+output: 
+  html_document:
+    df_print: paged
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+## School Enrollment
+
+School enrollment is a good measure to analyze how students are engaged in educational
+programs and how they are thinking about their futures as specialized workers.
+
+As children spend more time studying, they could improve their knowledge and be
+able to work on a higher demand job in the future.
+
+On this analysis, I try to expose the influence of some indicators on students
+enrollment, focused primarily on Brazil's context. The indicators that we will
+cover are:
+
+* GDP invested in education
+* Children from 7 to 14 years old that are employed
+* Income distribution between classes of population
+
+To get the data about students enrollment and the indicators, a dataset form 
+World Bank Group was used and more details about it could be obtained from its
+[website](https://datacatalog.worldbank.org/search/dataset/0037712/World-Development-Indicators).
+
+```{r Loading the libraries, include=FALSE, echo=FALSE}
+library(tidyverse)
+library(janitor)
 ```
 
-## Annotations
+```{r Setting global variables, include=FALSE, echo=FALSE}
+# Setting working directory to make it easier to manage the directories
+setwd('/home/boa50/Desenvolvimento/education-case-study')
 
-Using EdStatsSeries.csv we could get information about the indicators
+legend_order <- c('Brazil', 'High income', 'Upper middle income', 
+                  'Lower middle income', 'Low income')
+color_scale <- 'Set2'
+```
+
+```{r Setting custom functions, include=FALSE, echo=FALSE}
+# Function to load the .csv files with cleaned column names, so it will be
+# easier to work with the data
+read_dataset <- function(file_name, dataset_folder='dataset/') {
+  file_path <- paste(dataset_folder, file_name, sep='')
+  df <- read_csv(file_path) %>% clean_names()
+  return(df)
+}
+```
+
+I did some cleaning on the dataset so it could be more useful to our analysis.
+
+```{r Preparing the data, message=FALSE}
+# Data obtained from https://datacatalog.worldbank.org/search/dataset/0037712/World-Development-Indicators at 04/07/2022
+df_countries <- read_dataset('WDICountry.csv')
+df_cleaned <- read_dataset('WDIData.csv') %>%
+  # Getting data until 2019 to ignore pandemic situation
+  select(c(country_code, indicator_code, x2010:x2019)) %>%
+  # Removing rows where all year values are null
+  filter(rowSums(is.na(.)) < 10) %>%
+  # Getting income groups of each country
+  merge(read_dataset('WDICountry.csv'), by='country_code') %>%
+  select(c(country_code, income_group, indicator_code, x2010:x2019)) %>%
+  # Removing countries not associated with any Income Group
+  filter(!is.na(income_group)) %>%
+  # Creating a different group to Brazil, to make it comparable with other groups
+  mutate(income_group=if_else(country_code == 'BRA', 'Brazil', income_group))
+```
+
+Below there is a preview on how the dataset become organized.
+
+```{r Showing the cleaned dataset, echo=FALSE}
+head(df_cleaned)
+```
+
+### How is school enrollment improving over the last years?
+
+To get a perspective of school enrollment, I checked indicators related to
+enrollments on main levels of education: primary, secondary and tertiary. The
+enrollments were grouped by the Income Group of the countries as defined on
+*WDICountry.csv* file. Only Brazil was took off of its group (Upper middle income)
+to make it easier to compare with other groups.
+
+The choice of indicators was made by using a spreadsheet with the *WDISeries.csv*
+file.
+
+```{r Definining enrollment indicators}
+## Primary and secondary indicators were net indicators so they could reflect better the students that needed to be at each level
+# SE.PRM.NENR: School enrollment, primary (% net)
+# SE.SEC.NENR: School enrollment, secondary (% net)
+# SE.TER.ENRR: School enrollment, tertiary (% gross)
+enrollment_indicators <- c('SE.PRM.NENR', 'SE.SEC.NENR', 'SE.TER.ENRR')
+```
+
+After determining the indicators, we tried to group the data on a way that we 
+could show the differences between groups.
+
+```{r Grouping enrollment data}
+df_enrollment <- df_cleaned %>%
+  filter(indicator_code %in% enrollment_indicators) %>%
+  # Getting only the last 5 year to get results based on previous years investments
+  select(c(country_code, income_group, indicator_code, x2015:x2019)) %>%
+  # pivoting table to make it easier to plot
+  pivot_longer(x2015:x2019, names_to='year', values_to='enrollment') %>%
+  # cleaning year values to make it easier to use as label
+  mutate(year=gsub('x', '', .$year))
+```
+
+I also checked the presence of NA values on the metric variable of the dataset.
+
+```{r Checking NA values, echo=FALSE}
+print(
+  paste(
+    'Percentage of NA values on enrollment column: ',
+    trunc(sum(is.na(df_enrollment$enrollment)) / nrow(df_enrollment)*100), 
+    '%', 
+    sep=''
+    )
+  )
+```
+
+And as you can see, about 40% of our enrollment variable is filled with NA values.
+As this type of values does not change much between years, I used a strategy to
+fill the missing values based on previous years and if there isn't a previous year
+fill with future data.
+
+```{r Filling missing values}
+df_enrollment <- df_enrollment %>%
+  group_by(country_code, indicator_code) %>%
+  # Using the filling strategy to get values from previous years, if it doesn't exist, get from future year
+  fill(enrollment, .direction='downup') %>%
+  # Filtering to get only the countries with at least 1 not NA value for each indicator
+  filter(!is.na(enrollment))
+```
+
+To check how each group is improving on their enrollment level, I plotted a line 
+chart showig the differences between them.
+
+```{r Students enrollment chart, echo=FALSE, message=FALSE, warning=FALSE, fig.asp=0.5, fig.width=9, out.width="100%"}
+# setting representative labels to the indicators
+indicators_labels <- c(
+  'SE.PRM.NENR' = 'Primary Education',
+  'SE.SEC.NENR' =  'Secondary Education',
+  'SE.TER.ENRR' = 'Tertiary Education'
+)
+
+df_enrollment %>%
+  group_by(income_group, indicator_code, year) %>%
+  summarise(mean=mean(enrollment), sd=sd(enrollment)) %>%
+  ggplot(aes(x=year, y=mean, group=income_group)) +
+  theme_minimal() +
+  geom_line(aes(color=income_group), size=1) +
+  geom_ribbon(aes(ymin=mean - sd, ymax=mean + sd, fill=income_group), alpha=.15) +
+  expand_limits(y = 0) +
+  # changing the order of the legend values
+  scale_fill_brewer(breaks=legend_order, palette=color_scale) +
+  scale_colour_brewer(breaks=legend_order, palette=color_scale) +
+  # formatting the y labels to include a percent sign
+  scale_y_continuous(labels=function(y) paste(y, '%', sep='')) +
+  facet_wrap(vars(indicator_code), labeller=as_labeller(indicators_labels)) +
+  labs(title='Average enrollment per Income Group and Education level', 
+       subtitle='The enrollment is calculated based on the age group of the specific education level',
+       x='Year', y='Enrollment', color='Income Group', fill='Income Group')
+```
+
+As we can see, there is a small difference on the Primary education level and it
+increases on the other levels. It could represent a less given importance to the
+other levels or some economic/social factor influences this variations. Another
+interesting observation is that there is a huge standard deviation (represented
+by the color shadows) inside each Income Group.
+
+The problem with this is that children will become less capable of perform on
+more specialized jobs, making it difficult to improve the overall education
+quality of the countries.
+
+To this analysis, I will give a special attention to secondary education as it
+can serve as a baseline to help children acquire great improvements on their
+education.
+
