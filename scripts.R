@@ -14,6 +14,7 @@ read_dataset <- function(file_name, dataset_folder='dataset/') {
   return(df)
 }
 
+
 df_cleaned <- read_dataset('WDIData.csv') %>%
   # get data until 2019 to ignore pandemic situation
   select(c(country_code, indicator_code, x2010:x2019)) %>%

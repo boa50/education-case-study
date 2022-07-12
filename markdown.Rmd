@@ -119,7 +119,7 @@ df_enrollment <- df_cleaned %>%
 I also checked the presence of NA values on the metric variable of the dataset.
 
 ```{r Checking NA values in enrollments, echo=FALSE}
-print(
+cat(
   paste(
     'Percentage of NA values on enrollment column: ',
     trunc(sum(is.na(df_enrollment$enrollment)) / nrow(df_enrollment)*100), 
@@ -156,7 +156,7 @@ indicators_labels <- c(
 
 df_enrollment %>%
   group_by(income_group, indicator_code, year) %>%
-  summarise(mean=mean(enrollment), sd=sd(enrollment)) %>%
+  summarise(mean=mean(enrollment), sd=sd(enrollment), .groups='drop') %>%
   ggplot(aes(x=year, y=mean, group=income_group)) +
   theme_minimal() +
   geom_line(aes(color=income_group), size=1) +
@@ -207,10 +207,27 @@ df_enrollment %>%
        x='Enrollment', y='Number of Countries')
 ```
 
-### TODO
+According to the values about secondary school enrollment using Upper middle
+income group data we could see that Brazil's enrollment level is still below a
+large group of countries on the same group. So with this in mind, we check that
+there is a lot of room to improvement.
+
+### What influence does money spent in education have?
+
+To get started on which aspects could be improved to get a better school
+enrollment level, we analyzed data about GDP spent in education.
+
+To clarify the concept, GDP 
+(according to (OECD)[https://data.oecd.org/gdp/gross-domestic-product-gdp.htm]) 
+"is the standard measure of the value added created through the production of 
+goods and services in a country during a certain period". So I tought that it
+could be a good starting point on our analysis.
+
+The first step, as always was to group and clean the data about this indicator,
+that represents the percentage of the country's GDP spent in education.
 
 ```{r Grouping GDP spent in education data}
-# Checking the investment in education based on GDP (https://data.oecd.org/gdp/gross-domestic-product-gdp.htm)
+# Checking the investment in education based on GDP
 df_gdp_spent_percent <- df_cleaned %>%
   filter(indicator_code  == 'SE.XPD.TOTL.GD.ZS') %>%
   # Pivoting table to make it easier to plot
@@ -219,8 +236,13 @@ df_gdp_spent_percent <- df_cleaned %>%
   mutate(year=gsub('x', '', .$year))
 ```
 
+We checked the number of NA values to all indicator as it is a constant 
+difficulty using this dataset, and to this case we used the same strategy as the
+previous indicator, to fill the missing data using previous year data and if it
+doesn't exist, getting data from future years.
+
 ```{r Checking NA values in GDP spent, echo=FALSE}
-print(
+cat(
   paste(
     'Percentage of NA values on gdp_percent column: ',
     trunc(sum(is.na(df_gdp_spent_percent$gdp_percent)) / nrow(df_gdp_spent_percent)*100), 
@@ -241,7 +263,7 @@ df_gdp_spent_percent <- df_gdp_spent_percent %>%
 ```{r Percentage of GDP spent per group, echo=FALSE, message=FALSE, warning=FALSE}
 df_gdp_spent_percent %>%
   group_by(income_group, indicator_code, year) %>%
-  summarise(mean=mean(gdp_percent), sd=sd(gdp_percent)) %>%
+  summarise(mean=mean(gdp_percent), sd=sd(gdp_percent), .groups='drop') %>%
   ggplot(aes(x=year, y=mean, group=income_group)) +
   theme_minimal() +
   geom_line(aes(color=income_group), size=1) +
@@ -256,6 +278,15 @@ df_gdp_spent_percent %>%
        x='Year', y='GDP Spent', color='Income Group', fill='Income Group')
 ```
 
+The chart above shows that there is little variation on the percentage of GDP
+spent in education among all countries during the last 10 years. So, we conclude
+that the GDP spent in education is not relevant to our analysis.
+
+But wait! This is only part of the analysis on GDP, because it covers only the
+variation in percentage and countries could have a huge difference on absolute
+values of GDP and GDP per capita. So we tried to extract this type of information
+and combine it with the data about spendings in education.
+
 ```{r Grouping GDP per capita spent in education data}
 # Getting GDP per capita changes over time
 df_gdp <- df_cleaned %>%
@@ -265,6 +296,7 @@ df_gdp <- df_cleaned %>%
   # Cleaning year values to make it easier to use as label
   mutate(year=gsub('x', '', .$year)) %>%
   group_by(country_code, indicator_code) %>%
+  # Using the strategy to fill NA values to get similar number of coutries' values
   fill(gdp_per_capita, .direction='downup') %>%
   # Filtering to get only the countries with at least 1 not NA value for each indicator
   filter(!is.na(gdp_per_capita))
@@ -283,7 +315,7 @@ df_gdp_spent_per_capita <- df_gdp_spent_percent %>%
 ```{r GDP spent per capita per group, echo=FALSE, message=FALSE, warning=FALSE}
 df_gdp_spent_per_capita %>%
   group_by(income_group, year) %>%
-  summarise(mean=mean(gdp_spent_per_capita), sd=sd(gdp_spent_per_capita)) %>%
+  summarise(mean=mean(gdp_spent_per_capita), sd=sd(gdp_spent_per_capita), .groups='drop') %>%
   ggplot(aes(x=year, y=mean, group=income_group)) +
   theme_minimal() +
   geom_line(aes(color=income_group), size=1) +
@@ -298,6 +330,10 @@ df_gdp_spent_per_capita %>%
        caption='The values are based on 2015 US$',
        x='Year', y='GDP per capita spent', color='Income Group', fill='Income Group')
 ```
+
+Now we can see that the difference on absolute values of GDP per capita is very
+big between the High income group and other groups, with low variations during 
+the last years.
 
 ```{r Distribution of GDP spent per capita of the High income group, echo=FALSE, message=FALSE, warning=FALSE}
 # Let's compare how far we are from the majority of high income countries
@@ -319,15 +355,34 @@ df_gdp_spent_per_capita %>%
        x='GDP per capita spent', y='Number of Countries')
 ```
 
+Next, we checked how Brazil's GDP per capita is compared to the High income
+group. And as we see its' value is below all other countries. It shows that we
+need to increase our investments on education to get better results.
+
+### Does children with jobs have more or less oportunities?
+
+After that, the impacts of children employment were studied to verify if there
+is some correlation with children enrollment in schools or not.
+
+We expected there it would have, as children spending more time working will
+have less time available to evolve their education.
+
 ```{r Filtering data about children employment}
 # Getting data on children in employment 7 - 14 year
 df_children_employment <- df_cleaned %>% filter(indicator_code  == 'SL.TLF.0714.ZS')
 ```
 
+On this indicator we changed the strategy of getting values from different years
+to show the variations. This happened because the number of NA values on it is
+so huge that was preferable to get only the last year with valid information.
+
+To not get an outdated information, we chose to pick the last available data
+from the last 5 years.
+
 ```{r Checking NA values in children employment, echo=FALSE}
 # Almost 85% of the data is NA
-# because of this we will use the strategy to get only the last year from the last five
-print(
+# Because of this we will use the strategy to get only the last year from the last five
+cat(
   paste(
     'Percentage of NA values on years columns: ',
     trunc(sum(rowSums(is.na(df_children_employment))) / (nrow(df_children_employment)*10)*100), 
@@ -360,6 +415,21 @@ ggplot(df_children_employment, aes(x=income_group, y=children_employment)) +
        x='Income Group', y='Children Employment')
 ```
 
+As we expected, countries with lower incomes have more children employed than
+those with higher incomes showing a good correlation with the data about students
+enrollment.
+
+On this chart we could not find significant data about High income countries, 
+because of this the part corresponding to it stayed blank. Analyzing Brazil's
+position, we could check that it is in a good spot on this indicator.
+
+### Is income distribution really a problem?
+
+On the last step, we analyzed data about income share between population groups.
+
+The population was divided into 5 categories representing the richest to the
+poorest people.
+
 ```{r Definining poverty indicators}
 # getting data about poverty !caution
 # distribution of income share per group
@@ -380,10 +450,10 @@ df_poverty <- df_cleaned %>%
   mutate(year=gsub('x', '', year))
 ```
 
-```{r Checking NA values in income share, echo=FALSE}
+```{r Checking NA values in income share, echo=FALSE, results='hold'}
 # Almost 50% of the data has NA values
 # because of this we will use the strategy to fill years with previous values or next values
-print(
+cat(
   paste(
     'Percentage of NA values on income_share column: ',
     trunc(sum(is.na(df_poverty$income_share)) / nrow(df_poverty)*100), 
@@ -402,15 +472,24 @@ df_poverty <- df_poverty %>%
 
 df_poverty_grouped <- df_poverty %>%
   group_by(income_group, indicator_code, year) %>%
-  summarise(mean=mean(income_share), sd=sd(income_share)) %>%
+  summarise(mean=mean(income_share), sd=sd(income_share), .groups='drop_last') %>%
   # Getting the difference of values between years per group
   mutate(years_difference=abs(mean - lag(mean)))
 ```
 
+To build a more interesting visualization, we checked if there is big variations
+of information through years.
+
+With the histogram below we could see that the variations on the values are very
+low, where a big part of the values varied less than 0.5% between years.
+
+Using this information, we filtered the data to get only the last year 
+information.
+
 ```{r Checking difference in income share values, echo=FALSE, message=FALSE, warning=FALSE}
 # As the difference of values between years are so small, we are
 # comparing values based only on the last year
-print(
+cat(
   paste(
     'Maximum difference of values between years: ',
     max(df_poverty_grouped$years_difference, na.rm=TRUE), 
@@ -456,3 +535,49 @@ df_poverty_grouped %>%
   labs(title='Percentage of income share per Population Group and Income Group on 2019', 
        x='Income Group', y='Income Share', fill='Population Share Group')
 ```
+
+On the above chart we could get that in Brazil, the differences of income share
+between population groups is very big, bigger that any other country analyzed.
+These differences could increase the difficulties that poorer people have to
+sustain their lives, making it harder to them to improve their education level.
+
+We could also observe that High income countries have smaller variations through
+groups showing that a more balanced income distribution could leave people with
+better opportunities to continue their school enrollment.
+
+## Conclusions
+
+Using the World Bank data we could get some insights on which aspects Brazil
+could improve to offer better opportunities to its population, showing that 
+to maintain children going to school investments in education are crucial, as
+well as sustaining low levels of children employment and reducing inequalities 
+on income share through people.
+
+## Future Analises
+
+As we discovered during the cleaning process of the data, there are a lot of
+NA values through it and with this we needed to make some assumptions on how
+the data would be on previous and future years. Regression algorithms could be
+used to obtain better predictions on the behavior of the data, but we tried
+to make the analysis simpler.
+
+Other important aspects that could be noted is that World Bank could be considered
+a secondary source of the data on some indicators (and a good one) and some 
+mistakes could have been done during the process of obtaining the data. So getting
+data from primary sources could direct us to bit different results.
+
+## Final toughts
+
+On this analysis we checked some indicators that we would believe that could 
+increase children enrollment in schools, but it is the most important part in
+education? Maybe children that study only at home could get better results than
+those that go to school. If this is true our whole analysis could be changed :)
+
+Other thing that we have to pay attention when working with data is that
+correlation is not the same as causation, so we need to be very careful with this
+assumptions.
+
+I leave you guys with a last question, if you would like to change the education
+system in the whole world, what most unexpected thing would you change?
+
+I end here with a last quote: "*Think differently and have a better life.*"
