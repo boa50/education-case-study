@@ -2,3 +2,4 @@
 .Rhistory
 dataset/*
 !dataset/data-location-download
+.Rproj.user
